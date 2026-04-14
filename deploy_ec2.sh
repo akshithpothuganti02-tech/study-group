@@ -59,11 +59,11 @@ After=network.target
 [Service]
 User=$USER
 Group=www-data
-WorkingDirectory=$APP_DIR/backend_py
+WorkingDirectory=$APP_DIR
 Environment="PATH=$APP_DIR/venv/bin"
 EnvironmentFile=/etc/environment
-# Library is installed via pip now, so we don't strictly need PYTHONPATH
-ExecStart=$APP_DIR/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+# Run from parent dir so Python can find the backend_py package
+ExecStart=$APP_DIR/venv/bin/uvicorn backend_py.main:app --host 127.0.0.1 --port 8000
 Restart=always
 
 [Install]
