@@ -9,33 +9,34 @@ A full-stack cloud-based application that allows students to find, create, and s
 | Layer | Technology |
 |---|---|
 | Frontend | React 18 + Vite + Tailwind CSS |
-| Backend | Node.js (AWS Lambda functions) |
-| API | AWS API Gateway (REST) |
+| Backend | Python 3 + FastAPI |
 | Auth | AWS Cognito |
 | Database | AWS DynamoDB |
 | Storage | AWS S3 |
 | Email | AWS SES |
-| Hosting | AWS Amplify |
-| Custom Package | study-sync-utils (npm) |
+| Hosting | AWS EC2 (Backend) / AWS Amplify (Frontend) |
+| Custom Package | study-sync-utils-py (PyPI) |
 
 ---
 
 ## Project Structure
 
-```
+```text
 study-group-app/
-├── study-sync-utils/     # Custom npm package
-├── backend/              # Lambda function handlers
-│   ├── shared/           # DynamoDB, SES, S3 helpers
-│   ├── groups/           # Group CRUD + join/leave
-│   ├── sessions/         # Session CRUD
-│   └── users/            # Profile + file upload
+├── study_sync_utils_py/  # Custom Python package (PyPI)
+├── backend_py/           # FastAPI backend
+│   ├── api/              # API routes (groups, sessions, users)
+│   ├── shared/           # DynamoDB, SES, S3, Auth helpers
+│   ├── main.py           # FastAPI application entry point
+│   └── requirements.txt  # Python dependencies
 ├── frontend/             # React application
 │   └── src/
 │       ├── components/   # Auth, Groups, Sessions, Layout
 │       ├── pages/        # Dashboard, BrowseGroups, GroupDetail, Profile
 │       ├── context/      # AuthContext
 │       └── services/     # API, auth helpers
+├── DEPLOYMENT_GUIDE.md   # EC2 deployment instructions
+├── deploy_ec2.sh         # Deployment automation script
 └── README.md
 ```
 
@@ -118,115 +119,36 @@ Set the sender email in Lambda environment variables as `SES_SENDER_EMAIL`.
 
 ---
 
-### Step 5 — Lambda IAM Role
+### Step 5 — EC2 IAM Role
 
 Go to **IAM → Roles → Create role**:
-- Trusted entity: AWS service → Lambda
+- Trusted entity: AWS service → EC2
 - Attach these policies:
   - `AmazonDynamoDBFullAccess`
   - `AmazonS3FullAccess`
   - `AmazonSESFullAccess`
-  - `CloudWatchLogsFullAccess`
-- Role name: `StudySyncLambdaRole`
+- Role name: `StudySyncEC2Role`
 
 ---
 
-### Step 6 — Deploy Lambda Functions
+### Step 6 — Deploy FastAPI Backend to EC2
 
-For each function, go to **Lambda → Create function**:
-- Author from scratch
-- Runtime: Node.js 20.x
-- Execution role: `StudySyncLambdaRole`
+1. **Launch EC2 Instance:**
+   - OS: Ubuntu 24.04 LTS (free-tier eligible t2.micro or t3.micro).
+   - In the "Advanced Details" section, attach the `StudySyncEC2Role` IAM Instance Profile.
+   - Attach a Key Pair that you have access to.
 
-**Functions to create:**
+2. **Configure Security Group:**
+   - Allow **SSH (Port 22)** from your IP.
+   - Allow **Custom TCP (Port 8000)** from Anywhere (0.0.0.0/0).
 
-| Function Name | File | Handler |
-|---|---|---|
-| studysync-createGroup | groups/createGroup.js | createGroup.handler |
-| studysync-getGroups | groups/getGroups.js | getGroups.handler |
-| studysync-getGroupById | groups/getGroupById.js | getGroupById.handler |
-| studysync-updateGroup | groups/updateGroup.js | updateGroup.handler |
-| studysync-deleteGroup | groups/deleteGroup.js | deleteGroup.handler |
-| studysync-joinGroup | groups/joinGroup.js | joinGroup.handler |
-| studysync-leaveGroup | groups/leaveGroup.js | leaveGroup.handler |
-| studysync-createSession | sessions/createSession.js | createSession.handler |
-| studysync-getSessions | sessions/getSessions.js | getSessions.handler |
-| studysync-updateSession | sessions/updateSession.js | updateSession.handler |
-| studysync-deleteSession | sessions/deleteSession.js | deleteSession.handler |
-| studysync-getUserProfile | users/getUserProfile.js | getUserProfile.handler |
-| studysync-updateUserProfile | users/updateUserProfile.js | updateUserProfile.handler |
-| studysync-getUploadUrl | users/getUploadUrl.js | getUploadUrl.handler |
+3. **Provide Environment Variables:**
+   - Provide `S3_BUCKET`, `AWS_REGION`, and `SES_SENDER_EMAIL` inside your EC2 environment or `.env` file since DynamoDB/Cognito utilize IAM roles directly.
 
-**For each function:**
-1. Upload a ZIP file containing the function file + node_modules (`backend/` folder contents)
-2. Set **Environment Variables**:
-   - `USERS_TABLE` = `StudySync-Users`
-   - `GROUPS_TABLE` = `StudySync-Groups`
-   - `SESSIONS_TABLE` = `StudySync-Sessions`
-   - `S3_BUCKET` = your bucket name
-   - `SES_SENDER_EMAIL` = your verified SES email
-   - `AWS_REGION` = `eu-west-1`
+4. **Follow `DEPLOYMENT_GUIDE.md`**:
+   - We have provided a comprehensive `DEPLOYMENT_GUIDE.md` complete with an automated script (`deploy_ec2.sh`) to effortlessly set up Python, install your utility script package via wheel, and launch FastAPI securely to the background as a `systemd` process.
 
-To create the ZIP: in the `backend/` folder, run `npm install` then zip the entire folder.
-
----
-
-### Step 7 — API Gateway
-
-Go to **API Gateway → Create API → REST API**:
-- Name: `StudySync-API`
-- Endpoint type: Regional
-
-**Add a Cognito Authorizer:**
-- Authorizers → Create authorizer
-- Type: Cognito
-- User pool: your pool
-- Token source: `Authorization`
-- Name: `CognitoAuth`
-
-**Create resources and methods** (attach corresponding Lambda + Authorizer to each):
-
-```
-/groups
-  GET  → studysync-getGroups
-  POST → studysync-createGroup
-
-/groups/{groupId}
-  GET    → studysync-getGroupById
-  PUT    → studysync-updateGroup
-  DELETE → studysync-deleteGroup
-
-/groups/{groupId}/join
-  POST → studysync-joinGroup
-
-/groups/{groupId}/leave
-  POST → studysync-leaveGroup
-
-/groups/{groupId}/sessions
-  GET  → studysync-getSessions
-  POST → studysync-createSession
-
-/groups/{groupId}/upload-url
-  POST → studysync-getUploadUrl
-
-/groups/{groupId}/files
-  GET  → studysync-getUploadUrl
-
-/sessions/{sessionId}
-  PUT    → studysync-updateSession
-  DELETE → studysync-deleteSession
-
-/users/profile
-  GET → studysync-getUserProfile
-  PUT → studysync-updateUserProfile
-```
-
-**Enable CORS** on each resource (Actions → Enable CORS).
-
-**Deploy API:**
-- Actions → Deploy API
-- Stage: `prod`
-- Note the **Invoke URL** (e.g., `https://abc123.execute-api.eu-west-1.amazonaws.com/prod`)
+Your API will be running at `http://<YOUR_EC2_IP>:8000`. Keep this URL handy for the frontend environment setup.
 
 ---
 
@@ -247,7 +169,7 @@ const awsConfig = {
 
 Edit `frontend/src/.env` (create this file):
 ```
-VITE_API_URL=https://abc123.execute-api.eu-west-1.amazonaws.com/prod
+VITE_API_URL=http://<YOUR_EC2_IP>:8000
 ```
 
 ---
@@ -262,22 +184,22 @@ VITE_API_URL=https://abc123.execute-api.eu-west-1.amazonaws.com/prod
    - Output directory: `dist`
    - Root directory: `frontend`
 5. Add environment variables:
-   - `VITE_API_URL` = your API Gateway URL
+   - `VITE_API_URL` = `http://<YOUR_EC2_IP>:8000`
 6. Click **Save and deploy**
 
 Amplify will give you a public URL like `https://main.xxxx.amplifyapp.com`
 
 ---
 
-### Step 10 — Publish the Custom npm Package
+### Step 10 — Publish the Custom Python Package
 
 ```bash
-cd study-sync-utils
-npm login
-npm publish --access public
+cd study_sync_utils_py
+python3 -m build
+twine upload dist/*
 ```
 
-The package will be available at: `https://www.npmjs.com/package/study-sync-utils`
+The package will be available securely in PyPI (or TestPyPI depending on your target). Alternatively, deploy locally as shown in `DEPLOYMENT_GUIDE.md`.
 
 ---
 
@@ -298,7 +220,7 @@ The package will be available at: `https://www.npmjs.com/package/study-sync-util
 
 AWS Amplify provides automatic CI/CD — every `git push` to the `main` branch triggers a new build and deployment. The build history and logs are visible in the Amplify Console.
 
-The backend (Lambda) can be updated by re-uploading the ZIP file through the Lambda Console.
+The backend (EC2) can be updated manually by pulling the latest code onto the EC2 instance and restarting the systemd server: `git pull && sudo systemctl restart studysync`.
 
 ---
 
@@ -306,14 +228,12 @@ The backend (Lambda) can be updated by re-uploading the ZIP file through the Lam
 
 | Package | Purpose |
 |---|---|
-| @aws-sdk/client-dynamodb | DynamoDB operations |
-| @aws-sdk/lib-dynamodb | Simplified DynamoDB Document client |
-| @aws-sdk/client-ses | Email notifications |
-| @aws-sdk/client-s3 | File storage |
-| @aws-sdk/s3-request-presigner | Pre-signed upload/download URLs |
-| uuid | Unique ID generation |
-| study-sync-utils | Custom scheduling & matching library |
+| boto3 | AWS SDK (DynamoDB, SES, S3) |
+| fastapi / uvicorn | Backend REST framework and Web Server |
+| pydantic | Data validation for the backend |
+| python-jose | JWT token decoding and validation |
+| study_sync_utils_py | Custom scheduling & matching library |
 | react + react-router-dom | Frontend SPA framework |
-| aws-amplify | Cognito auth + S3 integration |
+| aws-amplify | Cognito auth |
 | axios | HTTP client |
 | tailwindcss | UI styling |
