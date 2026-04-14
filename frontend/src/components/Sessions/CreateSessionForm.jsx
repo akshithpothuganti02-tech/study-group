@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { createSession } from '../../services/api';
-import { TimeSlotGenerator } from 'study-sync-utils';
+import { createSession, suggestTimeSlots } from '../../services/api';
 
 /**
  * CreateSessionForm — modal form for scheduling a new study session.
- * Uses TimeSlotGenerator from study-sync-utils to suggest time slots.
+ * Suggests available time slots via the backend Python API.
  */
 const CreateSessionForm = ({ groupId, existingSessions = [], onSuccess, onClose }) => {
   const [form, setForm] = useState({
@@ -20,12 +19,18 @@ const CreateSessionForm = ({ groupId, existingSessions = [], onSuccess, onClose 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // When a date is selected, compute suggested free slots using TimeSlotGenerator
+  // When a date is selected, safely compute suggested free slots using backend Utility package
   useEffect(() => {
     if (!selectedDate) return;
-    const generator = new TimeSlotGenerator(60, 8, 22);
-    const available = generator.getAvailableSlots(selectedDate, existingSessions);
-    setSuggestedSlots(available.slice(0, 8)); // show max 8 suggestions
+    const fetchSlots = async () => {
+      try {
+        const res = await suggestTimeSlots(selectedDate);
+        setSuggestedSlots(res.slots || []);
+      } catch (err) {
+        console.error("Failed to load time slots", err);
+      }
+    };
+    fetchSlots();
   }, [selectedDate, existingSessions]);
 
   const applySlot = (slot) => {
@@ -104,7 +109,7 @@ const CreateSessionForm = ({ groupId, existingSessions = [], onSuccess, onClose 
                 onChange={(e) => setSelectedDate(e.target.value)} className="input-field" />
             </div>
 
-            {/* Suggested Slots from TimeSlotGenerator */}
+            {/* Suggested Slots */}
             {suggestedSlots.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

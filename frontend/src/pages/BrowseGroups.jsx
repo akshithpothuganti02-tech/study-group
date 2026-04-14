@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { fetchGroups, joinGroup, leaveGroup, fetchUserProfile } from '../services/api';
+import { fetchGroups, joinGroup, leaveGroup, fetchUserProfile, fetchRankedGroups } from '../services/api';
 import GroupCard from '../components/Groups/GroupCard';
-import { GroupMatcher } from 'study-sync-utils';
 
 const SUBJECTS = [
   'All', 'Mathematics', 'Statistics', 'Computer Science', 'Programming',
@@ -11,12 +10,12 @@ const SUBJECTS = [
 
 /**
  * BrowseGroups — searchable, filterable list of all public study groups.
- * Uses GroupMatcher from study-sync-utils to rank results by compatibility
- * when the user has subjects set on their profile.
+ * Ranks results by highest subject overlap compatibility.
  */
 const BrowseGroups = () => {
   const [groups, setGroups] = useState([]);
   const [filteredGroups, setFilteredGroups] = useState([]);
+  const [rankedGroups, setRankedGroups] = useState([]);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [joiningId, setJoiningId] = useState(null);
@@ -34,12 +33,14 @@ const BrowseGroups = () => {
 
   const loadData = async () => {
     try {
-      const [groupsRes, profileRes] = await Promise.all([
+      const [groupsRes, profileRes, rankedRes] = await Promise.all([
         fetchGroups(),
         fetchUserProfile(),
+        fetchRankedGroups()
       ]);
       setGroups(groupsRes.groups || []);
       setProfile(profileRes.profile);
+      setRankedGroups(rankedRes.ranked_groups || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -52,8 +53,7 @@ const BrowseGroups = () => {
 
     // Subject filter
     if (selectedSubject !== 'All') {
-      const matcher = new GroupMatcher(result);
-      result = matcher.filterBySubjects([selectedSubject]);
+      result = result.filter(g => (g.subjects || []).includes(selectedSubject));
     }
 
     // Search filter
@@ -67,15 +67,11 @@ const BrowseGroups = () => {
       );
     }
 
-    // If user has subjects, rank remaining results by compatibility
-    if (profile?.subjects?.length > 0 && selectedSubject === 'All' && !search) {
-      const matcher = new GroupMatcher(result);
-      const ranked = matcher.findBestMatches(profile, 50);
-      if (ranked.length > 0) {
-        const rankedGroups = ranked.map((r) => r.group);
-        const unranked = result.filter((g) => !rankedGroups.find((r) => r.groupId === g.groupId));
-        result = [...rankedGroups, ...unranked];
-      }
+    // If user has subjects, rank remaining results by compatibility using Backend API
+    if (profile?.subjects?.length > 0 && selectedSubject === 'All' && !search && rankedGroups.length > 0) {
+      const rankedItems = rankedGroups.map(r => r.group);
+      const unranked = result.filter(g => !rankedItems.find(r => r.groupId === g.groupId));
+      result = [...rankedItems, ...unranked];
     }
 
     setFilteredGroups(result);

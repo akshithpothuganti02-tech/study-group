@@ -27,6 +27,12 @@ export const fetchGroups = async (params = {}) => {
   return response.data;
 };
 
+export const fetchRankedGroups = async () => {
+  const headers = await getAuthHeaders();
+  const response = await axios.get(`${BASE_URL}/groups/ranked`, { headers });
+  return response.data;
+};
+
 export const fetchGroupById = async (groupId) => {
   const headers = await getAuthHeaders();
   const response = await axios.get(`${BASE_URL}/groups/${groupId}`, { headers });
@@ -71,6 +77,12 @@ export const fetchSessions = async (groupId, upcoming = false) => {
     headers,
     params: upcoming ? { upcoming: 'true' } : {},
   });
+  return response.data;
+};
+
+export const suggestTimeSlots = async (date) => {
+  const headers = await getAuthHeaders();
+  const response = await axios.post(`${BASE_URL}/sessions/suggest-slots`, { date }, { headers });
   return response.data;
 };
 

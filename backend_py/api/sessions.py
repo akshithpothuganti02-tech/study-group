@@ -72,3 +72,23 @@ def delete_session(session_id: str, user: dict = Depends(get_current_user)):
         
     table.delete_item(Key={"sessionId": session_id})
     return {"message": "Session deleted"}
+
+class SlotSuggestionRequest(BaseModel):
+    date: str
+
+@router.post("/suggest-slots")
+def suggest_time_slots(req: SlotSuggestionRequest, user: dict = Depends(get_current_user)):
+    from study_sync_utils_py.time_slot_generator import TimeSlotGenerator
+    
+    # 1. Fetch existing sessions to determine booked slots
+    response = table.scan()
+    all_sessions = response.get("Items", [])
+    
+    # Simple Python native filter to isolate the requested day
+    booked = [s for s in all_sessions if req.date in s.get("startTime", "")]
+    
+    # 2. Use utility library to safely generate open slots
+    generator = TimeSlotGenerator(60, 8, 22)
+    slots = generator.get_available_slots(req.date, booked)
+    
+    return {"slots": slots[:8]} # Return top 8 available slots

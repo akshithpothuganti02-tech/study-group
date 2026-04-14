@@ -51,11 +51,33 @@ def create_group(group: GroupCreate, user: dict = Depends(get_current_user)):
     table.put_item(Item=new_group)
     return {"message": "Group created successfully", "group": new_group}
 
+from study_sync_utils_py.group_matcher import GroupMatcher
+
 @router.get("")
 def get_groups():
     # Naive scan for demo purposes, identical to JS version logic usually
     response = table.scan()
     return {"groups": response.get("Items", [])}
+
+@router.get("/ranked")
+def get_ranked_groups(user: dict = Depends(get_current_user)):
+    # 1. Fetch user profile
+    users_table = dynamodb.Table(TABLES["USERS"])
+    user_resp = users_table.get_item(Key={"userId": user["id"]})
+    user_profile = user_resp.get("Item", {})
+    
+    if not user_profile.get("subjects"):
+        return {"ranked_groups": []}
+
+    # 2. Fetch all groups
+    groups_resp = table.scan()
+    all_groups = groups_resp.get("Items", [])
+
+    # 3. Use utility library to dynamically rank groups based on subjects
+    matcher = GroupMatcher(all_groups)
+    ranked = matcher.find_best_matches(user_profile, top_n=50)
+
+    return {"ranked_groups": ranked}
 
 @router.get("/{group_id}")
 def get_group_by_id(group_id: str):
