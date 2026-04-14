@@ -87,6 +87,27 @@ def get_group_by_id(group_id: str):
         raise HTTPException(status_code=404, detail="Group not found")
     return {"group": item}
 
+@router.get("/{group_id}/sessions")
+def get_group_sessions(group_id: str, user: dict = Depends(get_current_user)):
+    """Return all sessions belonging to a specific group."""
+    sessions_table = dynamodb.Table(TABLES["SESSIONS"])
+    response = sessions_table.scan()
+    all_sessions = response.get("Items", [])
+    group_sessions = [s for s in all_sessions if s.get("groupId") == group_id]
+    # Sort by startTime ascending
+    group_sessions.sort(key=lambda s: s.get("startTime", ""))
+    return {"sessions": group_sessions}
+
+@router.post("/{group_id}/sessions")
+def create_group_session(group_id: str, session: dict, user: dict = Depends(get_current_user)):
+    """Convenience alias — POST a session scoped to a group."""
+    from backend_py.api.sessions import SessionCreate, create_session as _create
+    # Inject groupId into the payload and delegate to the sessions router
+    session["groupId"] = group_id
+    from pydantic import TypeAdapter
+    validated = SessionCreate(**session)
+    return _create(validated, user)
+
 @router.post("/{group_id}/join")
 def join_group(group_id: str, user: dict = Depends(get_current_user)):
     user_id = user["id"]
