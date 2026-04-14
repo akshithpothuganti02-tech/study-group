@@ -1,11 +1,14 @@
 # EC2 Deployment Guide
 
 ## Prerequisites on AWS
+
+> **New to AWS Console?** See our detailed [Manual EC2 Provisioning Guide](AWS_EC2_MANUAL_SETUP.md) for step-by-step, click-by-click instructions on creating the IAM Role, Security Group, and EC2 Instance.
+
 1. **Launch an EC2 Instance**: Use **Ubuntu 24.04** (or 22.04) from the AWS Console. A `t2.micro` or `t3.micro` (free tier eligible) is perfect.
 2. **Security Group**: Ensure you open the following ports in your instance's Security Group:
    - `Port 22` (SSH) - for you to connect.
    - `Port 8000` (Custom TCP) - to access the FastAPI server.
-3. **IAM Role**: Create an IAM Role with `AmazonDynamoDBFullAccess`, `AmazonS3FullAccess`, and `AmazonSESFullAccess`. Attach this IAM role to your EC2 instance so `boto3` can securely access AWS services without `.env` keys.
+3. **IAM Role**: Create an IAM Role with `AmazonDynamoDBFullAccess`, `AmazonS3FullAccess`, and `AmazonSNSFullAccess`. Attach this IAM role to your EC2 instance so `boto3` can securely access AWS services without `.env` keys.
 
 ---
 
@@ -81,6 +84,7 @@ After=network.target
 User=ubuntu
 WorkingDirectory=/home/ubuntu/study-group-app/backend_py
 Environment="PATH=/home/ubuntu/study-group-app/venv/bin"
+EnvironmentFile=/etc/environment
 ExecStart=/home/ubuntu/study-group-app/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 Restart=always
 

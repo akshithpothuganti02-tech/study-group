@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from backend_py.shared.dynamodb import dynamodb, TABLES
 from backend_py.shared.auth import get_current_user
-from backend_py.shared.ses import send_session_notification
+from backend_py.shared.sns import send_session_notification
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 table = dynamodb.Table(TABLES["SESSIONS"])

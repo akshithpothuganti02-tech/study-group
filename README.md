@@ -13,7 +13,7 @@ A full-stack cloud-based application that allows students to find, create, and s
 | Auth | AWS Cognito |
 | Database | AWS DynamoDB |
 | Storage | AWS S3 |
-| Email | AWS SES |
+| Notifications | AWS SNS |
 | Hosting | AWS EC2 (Backend) / AWS Amplify (Frontend) |
 | Custom Package | study-sync-utils-py (PyPI) |
 
@@ -43,6 +43,8 @@ study-group-app/
 ---
 
 ## AWS Deployment Guide (No CLI Required)
+
+> **Need extreme click-by-click details?** We have a dedicated [AWS Services Manual Setup Guide](AWS_SERVICES_MANUAL_SETUP.md) breaking down DynamoDB, S3, Cognito, and SNS configurations mapped directly to the Python backend requirements.
 
 ### Prerequisites
 - AWS Student Account
@@ -126,7 +128,7 @@ Go to **IAM → Roles → Create role**:
 - Attach these policies:
   - `AmazonDynamoDBFullAccess`
   - `AmazonS3FullAccess`
-  - `AmazonSESFullAccess`
+  - `AmazonSNSFullAccess`
 - Role name: `StudySyncEC2Role`
 
 ---
@@ -143,7 +145,7 @@ Go to **IAM → Roles → Create role**:
    - Allow **Custom TCP (Port 8000)** from Anywhere (0.0.0.0/0).
 
 3. **Provide Environment Variables:**
-   - Provide `S3_BUCKET`, `AWS_REGION`, and `SES_SENDER_EMAIL` inside your EC2 environment or `.env` file since DynamoDB/Cognito utilize IAM roles directly.
+   - Provide `S3_BUCKET`, `AWS_REGION`, and `SNS_TOPIC_ARN` inside your EC2 environment or `.env` file since DynamoDB/Cognito utilize IAM roles directly.
 
 4. **Follow `DEPLOYMENT_GUIDE.md`**:
    - We have provided a comprehensive `DEPLOYMENT_GUIDE.md` complete with an automated script (`deploy_ec2.sh`) to effortlessly set up Python, install your utility script package via wheel, and launch FastAPI securely to the background as a `systemd` process.
@@ -211,7 +213,7 @@ The package will be available securely in PyPI (or TestPyPI depending on your ta
 4. Sign in → you should land on the Dashboard
 5. Create a study group with at least one subject
 6. Browse groups and join another group
-7. Schedule a session — email notification will be sent via SES
+7. Schedule a session — email notification will be sent to subscribed users via SNS
 8. Upload a study material file to the group
 
 ---
@@ -228,7 +230,7 @@ The backend (EC2) can be updated manually by pulling the latest code onto the EC
 
 | Package | Purpose |
 |---|---|
-| boto3 | AWS SDK (DynamoDB, SES, S3) |
+| boto3 | AWS SDK (DynamoDB, SNS, S3) |
 | fastapi / uvicorn | Backend REST framework and Web Server |
 | pydantic | Data validation for the backend |
 | python-jose | JWT token decoding and validation |

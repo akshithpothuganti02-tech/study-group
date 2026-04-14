@@ -57,6 +57,7 @@ User=$USER
 Group=www-data
 WorkingDirectory=$APP_DIR/backend_py
 Environment="PATH=$APP_DIR/venv/bin"
+EnvironmentFile=/etc/environment
 # Library is installed via pip now, so we don't strictly need PYTHONPATH
 ExecStart=$APP_DIR/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 Restart=always

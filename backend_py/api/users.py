@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from backend_py.shared.dynamodb import dynamodb, TABLES
 from backend_py.shared.auth import get_current_user
 from backend_py.shared.s3 import get_upload_presigned_url, get_download_presigned_url, list_group_files
+from backend_py.shared.sns import subscribe_user_to_topic
 
 router = APIRouter(prefix="/users", tags=["Users"])
 table = dynamodb.Table(TABLES["USERS"])
@@ -27,6 +28,10 @@ def get_user_profile(user: dict = Depends(get_current_user)):
             "availability": []
         }
         table.put_item(Item=item)
+        
+        # Auto-subscribe to SNS Topic since this is their first time logging in
+        subscribe_user_to_topic(user["email"])
+        
     return {"profile": item}
 
 @router.put("/profile")
