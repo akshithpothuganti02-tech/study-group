@@ -1,13 +1,17 @@
 /**
- * API service — all HTTP calls to the API Gateway / Lambda backend.
- * Automatically attaches the Cognito JWT token as a Bearer header.
+ * API service — all HTTP calls go to the FastAPI backend via Nginx.
+ * VITE_API_URL should be set to "" in /etc/environment on EC2 so that
+ * all API calls are relative (e.g. /groups) and Nginx routes them to
+ * the local FastAPI server on port 8000.
+ *
+ * For local dev: set VITE_API_URL=http://localhost:8000 in frontend/.env
  */
 
 import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
-// Replace with your actual API Gateway invoke URL after deployment
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://YOUR_API_ID.execute-api.eu-west-1.amazonaws.com/prod';
+// Use VITE_API_URL if defined (even as empty string), otherwise default to empty (Nginx routing)
+const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 /**
  * Returns an axios instance with the Authorization header pre-populated
