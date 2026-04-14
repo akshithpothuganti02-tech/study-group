@@ -78,12 +78,8 @@ systemctl start studysync
 echo "Building the React frontend..."
 cd $APP_DIR/frontend
 
-# Source /etc/environment and export variables so Vite can bake them into the React bundles
-set +e
-export $(grep -v '^#' /etc/environment | xargs)
-set -e
-
-sudo -E -u $USER bash -c "npm install && npm run build"
+# Source /etc/environment inside the ubuntu user session so Vite can bake them into the React bundles
+sudo -u $USER bash -c "export \$(grep -v '^#' /etc/environment | xargs) && npm install && npm run build"
 
 echo "Configuring Nginx Reverse Proxy..."
 NGINX_CONF="/etc/nginx/sites-available/studysync"
