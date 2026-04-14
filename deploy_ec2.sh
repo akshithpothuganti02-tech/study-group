@@ -96,8 +96,8 @@ server {
         try_files \$uri \$uri/ /index.html;
     }
 
-    # Proxy all API requests securely to FastAPI
-    location ~ ^/(groups|sessions|users) {
+    # Proxy all /api/* requests to the FastAPI backend
+    location /api/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;

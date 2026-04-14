@@ -10,8 +10,8 @@
 import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
-// Use VITE_API_URL if defined (even as empty string), otherwise default to empty (Nginx routing)
-const BASE_URL = import.meta.env.VITE_API_URL ?? '';
+// Use VITE_API_URL if defined, otherwise default to /api (Nginx routing)
+const BASE_URL = import.meta.env.VITE_API_URL ?? '/api';
 
 /**
  * Returns an axios instance with the Authorization header pre-populated
