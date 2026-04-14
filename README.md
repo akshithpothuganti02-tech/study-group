@@ -14,7 +14,7 @@ A full-stack cloud-based application that allows students to find, create, and s
 | Database | AWS DynamoDB |
 | Storage | AWS S3 |
 | Notifications | AWS SNS |
-| Hosting | AWS EC2 (Backend) / AWS Amplify (Frontend) |
+| Hosting | AWS EC2 (Unified Frontend + Backend via Nginx) |
 | Custom Package | study-sync-utils-py (PyPI) |
 
 ---
@@ -48,8 +48,7 @@ study-group-app/
 
 ### Prerequisites
 - AWS Student Account
-- GitHub account (for Amplify CI/CD)
-- Your code pushed to a **private** GitHub repository
+- Your code pushed to a **private** GitHub repository or copied to your EC2 instance.
 
 ---
 
@@ -142,7 +141,7 @@ Go to **IAM → Roles → Create role**:
 
 2. **Configure Security Group:**
    - Allow **SSH (Port 22)** from your IP.
-   - Allow **Custom TCP (Port 8000)** from Anywhere (0.0.0.0/0).
+   - Allow **HTTP (Port 80)** from Anywhere (0.0.0.0/0) to serve the Monolithic App via Nginx.
 
 3. **Provide Environment Variables:**
    - Provide `S3_BUCKET`, `AWS_REGION`, and `SNS_TOPIC_ARN` inside your EC2 environment or `.env` file since DynamoDB/Cognito utilize IAM roles directly.
@@ -150,46 +149,32 @@ Go to **IAM → Roles → Create role**:
 4. **Follow `DEPLOYMENT_GUIDE.md`**:
    - We have provided a comprehensive `DEPLOYMENT_GUIDE.md` complete with an automated script (`deploy_ec2.sh`) to effortlessly set up Python, install your utility script package via wheel, and launch FastAPI securely to the background as a `systemd` process.
 
-Your API will be running at `http://<YOUR_EC2_IP>:8000`. Keep this URL handy for the frontend environment setup.
+Your full application will be running natively at `http://<YOUR_EC2_IP>`. No port numbers needed! Nginx will serve the React UI and route specific data routes (`/users`, `/groups`, `/sessions`) seamlessly securely to the background Python API.
 
 ---
 
 ### Step 8 — Configure Frontend
 
-Edit `frontend/src/aws-exports.js`:
-```js
-const awsConfig = {
-  Auth: {
-    Cognito: {
-      userPoolId: 'eu-west-1_xxxxxxxxx',   // your User Pool ID
-      userPoolClientId: 'xxxxxxxxxxxx',      // your App Client ID
-      ...
-    },
-  },
-};
+Edit `/etc/environment` on your EC2 instance (before running the deployment script):
+```env
+SNS_TOPIC_ARN=arn:aws:sns:eu-west-1...
+VITE_COGNITO_USER_POOL_ID=eu-west-1_xxxxxxxxx
+VITE_COGNITO_CLIENT_ID=xxxxxxxxxxxx
+VITE_API_URL=""
 ```
-
-Edit `frontend/src/.env` (create this file):
-```
-VITE_API_URL=http://<YOUR_EC2_IP>:8000
-```
+*(Setting `VITE_API_URL` to empty makes it correctly route to itself through Nginx!)*
 
 ---
 
-### Step 9 — Deploy Frontend via AWS Amplify
+### Step 9 — Run the Automated Deployment Script
 
-1. Push your code to a **private** GitHub repository
-2. Go to **AWS Amplify → New app → Host web app**
-3. Connect to GitHub → select your repo → select branch `main`
-4. Build settings will auto-detect Vite. Confirm build commands:
-   - Build command: `npm run build`
-   - Output directory: `dist`
-   - Root directory: `frontend`
-5. Add environment variables:
-   - `VITE_API_URL` = `http://<YOUR_EC2_IP>:8000`
-6. Click **Save and deploy**
+SSH into your EC2 Instance, navigate to your code, and run:
+```bash
+chmod +x deploy_ec2.sh
+sudo ./deploy_ec2.sh
+```
 
-Amplify will give you a public URL like `https://main.xxxx.amplifyapp.com`
+Nginx will serve your application live at `http://<YOUR_EC2_IP>`!
 
 ---
 
@@ -207,7 +192,7 @@ The package will be available securely in PyPI (or TestPyPI depending on your ta
 
 ## Testing the Application
 
-1. Open the Amplify URL
+1. Open `http://<YOUR_EC2_IP>` in your browser
 2. Register with your email
 3. Verify your email via the code sent by Cognito
 4. Sign in → you should land on the Dashboard
@@ -218,11 +203,9 @@ The package will be available securely in PyPI (or TestPyPI depending on your ta
 
 ---
 
-## CI/CD
+## CI/CD Updates
 
-AWS Amplify provides automatic CI/CD — every `git push` to the `main` branch triggers a new build and deployment. The build history and logs are visible in the Amplify Console.
-
-The backend (EC2) can be updated manually by pulling the latest code onto the EC2 instance and restarting the systemd server: `git pull && sudo systemctl restart studysync`.
+The entire monolithic architecture (frontend and backend) can be updated manually by pulling the latest code onto the EC2 instance, re-running the deployment script, or systematically rebuilding the UI via `npm run build` and restarting the API via `sudo systemctl restart studysync`.
 
 ---
 

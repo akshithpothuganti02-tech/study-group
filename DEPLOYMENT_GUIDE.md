@@ -6,8 +6,7 @@
 
 1. **Launch an EC2 Instance**: Use **Ubuntu 24.04** (or 22.04) from the AWS Console. A `t2.micro` or `t3.micro` (free tier eligible) is perfect.
 2. **Security Group**: Ensure you open the following ports in your instance's Security Group:
-   - `Port 22` (SSH) - for you to connect.
-   - `Port 8000` (Custom TCP) - to access the FastAPI server.
+   - `Port 80` (HTTP) - to access the Unified Web Application.
 3. **IAM Role**: Create an IAM Role with `AmazonDynamoDBFullAccess`, `AmazonS3FullAccess`, and `AmazonSNSFullAccess`. Attach this IAM role to your EC2 instance so `boto3` can securely access AWS services without `.env` keys.
 
 ---
@@ -35,71 +34,10 @@ The `deploy_ec2.sh` script automates system updates, installs Python, creates a 
 
 ## Method 2: Deploying Manually
 
-If you prefer to understand the steps or fix issues along the way, you can deploy manually:
+Because the application is now a complex monolithic architecture requiring Python 3 (FastAPI), Node.js (Vite/React Build), and Nginx reverse proxy routing, deploying manually step-by-step is no longer recommended. 
 
-### 1. Install Dependencies
-```bash
-sudo apt-get update
-sudo apt-get install python3 python3-pip python3-venv
-```
-
-### 2. Set Up Virtual Environment
-```bash
-cd ~/study-group-app
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Deploy and Install the Utility Library
-As per the brief, the library must be treated as a standalone package. We will build it into a distribution file (wheel) and install it into our virtual environment:
-
-```bash
-cd ~/study-group-app/study_sync_utils_py
-pip install build setuptools wheel
-python3 -m build
-pip install dist/*.whl
-```
-*Note: If you are required to publish it to PyPI or TestPyPI, you can use `twine upload dist/*` here.*
-
-### 4. Install Backend Requirements
-Move back to the backend directory and install the API requirements:
-```bash
-cd ~/study-group-app
-pip install -r backend_py/requirements.txt
-```
-
-### 5. Create a Systemd Service (Background Process)
-To ensure the app stays running when you close your SSH terminal, create a service file:
-
-```bash
-sudo nano /etc/systemd/system/studysync.service
-```
-Paste the following (adjusting paths if needed):
-```ini
-[Unit]
-Description=StudySync FastAPI Server
-After=network.target
-
-[Service]
-User=ubuntu
-WorkingDirectory=/home/ubuntu/study-group-app/backend_py
-Environment="PATH=/home/ubuntu/study-group-app/venv/bin"
-EnvironmentFile=/etc/environment
-ExecStart=/home/ubuntu/study-group-app/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### 6. Start the Service
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable studysync
-sudo systemctl start studysync
-```
-
-### 6. Managing the Server
-- **Check Status**: `sudo systemctl status studysync`
-- **View Logs**: `sudo journalctl -u studysync -f`
-- **Restart (after making code changes)**: `sudo systemctl restart studysync`
+If you prefer to understand the system or fix issues along the way, simply open `deploy_ec2.sh` in a text editor to view the systematic terminal commands which execute:
+1. Python dependencies and local pip utility packaging.
+2. Backgrounding the API onto `127.0.0.1:8000` with Systemd.
+3. Nodejs installation and embedding `/etc/environment` using Vite.
+4. Nginx configuration mapping `/api` to the backend and `/` to the React files.

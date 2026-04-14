@@ -8,8 +8,12 @@ set -e
 echo "Updating system packages..."
 apt-get update && apt-get upgrade -y
 
-echo "Installing Python 3, pip, and virtual environment dependencies..."
-apt-get install -y python3 python3-pip python3-venv
+echo "Installing Python 3, pip, virtual environment, Nginx, and curl..."
+apt-get install -y python3 python3-pip python3-venv nginx curl
+
+echo "Installing Node.js... (NodeSource LTS)"
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y nodejs
 
 APP_DIR="/opt/study-group-app"
 USER="ubuntu"  # Default user for Ubuntu EC2
@@ -59,21 +63,62 @@ WorkingDirectory=$APP_DIR/backend_py
 Environment="PATH=$APP_DIR/venv/bin"
 EnvironmentFile=/etc/environment
 # Library is installed via pip now, so we don't strictly need PYTHONPATH
-ExecStart=$APP_DIR/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+ExecStart=$APP_DIR/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-echo "Reloading systemd, enabling and starting the service..."
+echo "Reloading systemd, enabling and starting the backend service..."
 systemctl daemon-reload
 systemctl enable studysync
 systemctl start studysync
 
-echo "Checking service status briefly..."
+echo "Building the React frontend..."
+cd $APP_DIR/frontend
+
+# Source /etc/environment and export variables so Vite can bake them into the React bundles
+set +e
+export $(grep -v '^#' /etc/environment | xargs)
+set -e
+
+sudo -E -u $USER bash -c "npm install && npm run build"
+
+echo "Configuring Nginx Reverse Proxy..."
+NGINX_CONF="/etc/nginx/sites-available/studysync"
+cat <<EOF > $NGINX_CONF
+server {
+    listen 80;
+    server_name _;
+
+    root $APP_DIR/frontend/dist;
+    index index.html;
+
+    # Serve React SPA router properly
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    # Proxy all API requests securely to FastAPI
+    location ~ ^/(groups|sessions|users) {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+
+# Enable the site and remove default
+ln -sf $NGINX_CONF /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+systemctl restart nginx
+
+echo "Checking backend service status briefly..."
 sleep 2
 systemctl status studysync --no-pager | head -n 10
 
-echo "Deployment complete! Your API should be accessible at http://<YOUR_EC2_PUBLIC_IP>:8000"
-echo "Note: Ensure port 8000 is open in your EC2 Security Group."
+echo "Deployment complete! Your Unified application should be accessible at http://<YOUR_EC2_PUBLIC_IP>"
+echo "Note: Ensure port 80 (HTTP) is open in your EC2 Security Group."

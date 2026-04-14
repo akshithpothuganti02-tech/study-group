@@ -37,16 +37,16 @@ A Security Group acts as a virtual firewall for your EC2 instance, controlling i
 3. Click the **Create security group** button.
 4. **Basic details**:
    * Security group name: `StudySync-SG`
-   * Description: "Allow SSH and Port 8000 for FastAPI"
+   * Description: "Allow SSH and HTTP Port 80 for Nginx proxy"
    * VPC: Keep the default VPC selected.
 5. **Inbound rules** (Click **Add rule** for each):
    * **Rule 1 (SSH)**:
      * Type: `SSH`
      * Port range: `22`
      * Source: `Anywhere-IPv4` (0.0.0.0/0) — *Alternatively, select `My IP` for better security so only you can SSH.*
-   * **Rule 2 (Backend API)**:
-     * Type: `Custom TCP`
-     * Port range: `8000`
+   * **Rule 2 (Web Server)**:
+     * Type: `HTTP`
+     * Port range: `80`
      * Source: `Anywhere-IPv4` (0.0.0.0/0)
 6. **Outbound rules**: Leave the default (All traffic / All ports / Destination 0.0.0.0/0).
 7. Click **Create security group**.
