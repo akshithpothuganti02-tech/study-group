@@ -45,7 +45,7 @@ const EditGroupPage = () => {
       const groupData = res.group;
       
       // Ensure only the creator can edit
-      if (groupData.creatorId !== user?.id) {
+      if (groupData.creatorId !== user?.userId) {
         navigate(`/groups/${groupId}`);
         return;
       }
