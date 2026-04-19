@@ -8,6 +8,7 @@ import BrowseGroups from './pages/BrowseGroups';
 import GroupDetailPage from './pages/GroupDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import CreateGroupForm from './components/Groups/CreateGroupForm';
+import EditGroupPage from './pages/EditGroupPage';
 
 /**
  * ProtectedLayout — wraps all authenticated routes.
@@ -52,6 +53,7 @@ const App = () => (
           <Route path="/groups" element={<BrowseGroups />} />
           <Route path="/groups/create" element={<CreateGroupForm />} />
           <Route path="/groups/:groupId" element={<GroupDetailPage />} />
+          <Route path="/groups/:groupId/edit" element={<EditGroupPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 

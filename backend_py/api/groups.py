@@ -26,6 +26,14 @@ class UploadUrlRequest(BaseModel):
     fileName: str
     contentType: str
 
+class GroupUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    subjects: Optional[List[str]] = None
+    maxSize: Optional[int] = None
+    preferredTimes: Optional[List[str]] = None
+    isPublic: Optional[bool] = None
+
 # ─── Create Group ─────────────────────────────────────────────────────────────
 
 @router.post("")
@@ -106,6 +114,69 @@ def delete_group(group_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Only the creator can delete this group")
     table.delete_item(Key={"groupId": group_id})
     return {"message": "Group deleted successfully"}
+
+# ─── Update Group ─────────────────────────────────────────────────────────────
+
+@router.put("/{group_id}")
+def update_group(group_id: str, group_update: GroupUpdate, user: dict = Depends(get_current_user)):
+    response = table.get_item(Key={"groupId": group_id})
+    group = response.get("Item")
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+        
+    if group.get("creatorId") != user["id"]:
+        raise HTTPException(status_code=403, detail="Only the creator can edit this group")
+        
+    update_expr_parts = []
+    expr_attrs = {}
+    expr_names = {}
+
+    if group_update.name is not None:
+        if not group_update.name.strip():
+            raise HTTPException(status_code=400, detail="Group name cannot be empty")
+        update_expr_parts.append("#n = :n")
+        expr_names["#n"] = "name"
+        expr_attrs[":n"] = group_update.name.strip()
+        
+    if group_update.description is not None:
+        update_expr_parts.append("description = :d")
+        expr_attrs[":d"] = group_update.description
+        
+    if group_update.subjects is not None:
+        if not group_update.subjects:
+            raise HTTPException(status_code=400, detail="At least one subject is required")
+        update_expr_parts.append("subjects = :s")
+        expr_attrs[":s"] = group_update.subjects
+        
+    if group_update.maxSize is not None:
+        update_expr_parts.append("maxSize = :ms")
+        expr_attrs[":ms"] = group_update.maxSize
+        
+    if group_update.preferredTimes is not None:
+        update_expr_parts.append("preferredTimes = :pt")
+        expr_attrs[":pt"] = group_update.preferredTimes
+        
+    if group_update.isPublic is not None:
+        update_expr_parts.append("isPublic = :ip")
+        expr_attrs[":ip"] = group_update.isPublic
+        
+    if not update_expr_parts:
+        return {"message": "No fields to update", "group": group}
+        
+    update_expr_parts.append("updatedAt = :ua")
+    expr_attrs[":ua"] = datetime.utcnow().isoformat() + "Z"
+    
+    update_kwargs = {
+        "Key": {"groupId": group_id},
+        "UpdateExpression": "SET " + ", ".join(update_expr_parts),
+        "ExpressionAttributeValues": expr_attrs,
+        "ReturnValues": "ALL_NEW"
+    }
+    if expr_names:
+        update_kwargs["ExpressionAttributeNames"] = expr_names
+        
+    updated = table.update_item(**update_kwargs)
+    return {"message": "Group updated successfully", "group": updated.get("Attributes")}
 
 # ─── Sessions sub-routes ──────────────────────────────────────────────────────
 
